@@ -2,6 +2,7 @@
 import gym
 from columnar import columnar
 import logging
+import matplotlib.pyplot as plt
 
 class Link:
     def __init__(self, start, finish, weight):
@@ -66,61 +67,28 @@ class Network:
         self.modification_factor = modification_factor
         logging.basicConfig(filename=log_file_name,filemode='w', level=logging.DEBUG)
 
-    def train_model(self, env, num_iter):
-        """Train the neural network to solve the "FrozenLake" puzzle
+    def test_model(self, env, num_runs):
+        """Calculate the win rate for a given number of runs
 
         Args:
-            env (TimeLimit): OpenAI environment
-            num_iter (int): Maximum number of game that can be played
+            num_runs (int): Number of runs in the test
 
         Returns:
-            int: number of game played before the agent is able to succeed
+            float: win rate
         """
-        # Each iteration plays a full new game
-        prev_snapshot = self.get_snapshot()
-        for i in range(num_iter):
-            # Log if change was made to network
-            snapshot = self.get_snapshot()
-            if (prev_snapshot == snapshot):
-                logging.debug("CHANGES: NO")
-            else:
-                logging.debug("CHANGES: YES")
-            logging.debug(self.to_string())
-            prev_snapshot = snapshot
-
+        wins = 0
+        for _ in range(num_runs):
             observation = env.reset()
-            # Each iteration pays a single move
-            for j in range(100):
-                # Get move
+            done = False
+            while (not done):
                 node = self.input_nodes[observation]
                 link = node.get_highest_link()
                 output_node = link.finish
                 action = output_node.value
-                # Play
-                observation, reward, done, info = env.step(action)
-                # Feedback
-                
-                if (done and j == 99):
-                    logging.debug("SHOULD CHANGE: NOTHING")
-                    logging.debug("END: DID NOT FINISH")
-                    break
-                if (done and int(reward) == 0):
-                    logging.debug(f"SHOULD CHANGE: Node {link.start.value}, link {action}")
-                    logging.debug("END: HOLE")
-                    link.update(-self.modification_factor)
-                    break
-                if (done and int(reward) == 1):
-                    logging.debug("SHOULD CHANGE: NOTHING")
-                    logging.debug("END: SUCCESS!")
-                    # return i
-                # Decrease weight if went to dead node
-                last_node = self.input_nodes[observation]
-                if (last_node.is_dead()):
-                    logging.debug(f"SHOULD CHANGE: Node {link.start.value}, link {action}")
-                    logging.debug("END: DEAD NODE")
-                    link.weight -= self.modification_factor
-                    break
-        # return num_successes
+                observation, reward, done, _ = env.step(action)
+            if (int(reward) == 1):
+                wins += 1
+        return wins/num_runs
 
 
     def to_string(self):
@@ -148,6 +116,77 @@ class Network:
                 snapshot += str(link.weight)
         return snapshot
 
+    def train_model(self, env, num_iter):
+        """Train the neural network to solve the "FrozenLake" puzzle
+
+        Args:
+            env (TimeLimit): OpenAI environment
+            num_iter (int): Maximum number of game that can be played
+
+        Returns:
+            int: number of game played before the agent is able to succeed
+        """
+        # win_rates = []
+        # num_tests=200
+
+        prev_snapshot = self.get_snapshot()
+        # Each iteration plays a full new game
+        for i in range(num_iter):
+            # Log if change was made to network
+            snapshot = self.get_snapshot()
+            if (prev_snapshot == snapshot):
+                logging.debug("CHANGES: NO")
+            else:
+                logging.debug("CHANGES: YES")
+            logging.debug(self.to_string())
+            prev_snapshot = snapshot
+
+            # Calculate win rate
+            # print(f'Run {i}')
+            # win_rates.append(self.test_model(env, num_tests))
+
+            observation = env.reset()
+            # Each iteration pays a single move
+            for j in range(100):
+                # Play
+                node = self.input_nodes[observation]
+                link = node.get_highest_link()
+                output_node = link.finish
+                action = output_node.value
+                observation, reward, done, info = env.step(action)
+                # Feedback
+                if (done and j == 99):
+                    logging.debug("SHOULD CHANGE: NOTHING")
+                    logging.debug("END: DID NOT FINISH")
+                    break
+                if (done and int(reward) == 0):
+                    logging.debug(f"SHOULD CHANGE: Node {link.start.value}, link {action}")
+                    logging.debug("END: HOLE")
+                    link.update(-self.modification_factor)
+                    break
+                if (done and int(reward) == 1):
+                    logging.debug("SHOULD CHANGE: NOTHING")
+                    logging.debug("END: SUCCESS!")
+                    return i
+                # Decrease weight if went to dead node
+                last_node = self.input_nodes[observation]
+                if (last_node.is_dead()):
+                    logging.debug(f"SHOULD CHANGE: Node {link.start.value}, link {action}")
+                    logging.debug("END: DEAD NODE")
+                    link.weight -= self.modification_factor
+                    break
+        # x = range(1, num_iter+1)
+        # plt.plot(x, win_rates)
+        # plt.xlabel('Run')
+        # plt.ylabel('Win rate')
+        # plt.title(f'STRATEGY 1: Average win rate for {num_tests} games after each training run')
+        # plt.show()
+
+        return None
+
+
+
+
 
 
 def main():
@@ -168,20 +207,13 @@ def main():
     
     # Create wrapper network object
     model = Network(input_nodes, output_nodes, 2, "test.log")
-
-    snap1 = model.get_snapshot()
-    snap2 = model.get_snapshot()
     
-
     # Start environment
     env = gym.make('FrozenLake-v0')
 
     # Train
     num_episodes = model.train_model(env, 150)
-
     print ("Solved in " + str(num_episodes) + " episodes.")
-
-    print (model.to_string())
 
 
 
