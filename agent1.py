@@ -1,4 +1,6 @@
 
+from columnar import columnar
+
 class link:
     def __init__(self, start, finish, weight):
         self.start = start
@@ -40,37 +42,59 @@ class node:
                 one_link_alive = True
         return not one_link_alive
 
+class network:
+    def __init__(self, input_nodes, output_nodes):
+        self.input_nodes = input_nodes
+        self.output_nodes = output_nodes
 
-def train_model(env, input_nodes, num_iter):
+    def train_model(self, env, num_iter):
 
-    modification_factor = 1
+        input_nodes = self.input_nodes
 
-    # Each iteration plays a full new game
-    for i in range(num_iter):
-        observation = env.reset()
-        # Each iteration pays a single move
-        for j in range(100):
-            # Play
-            node = input_nodes[observation]
-            link = node.get_highest_link()
-            output_node = link.finish
-            action = output_node.value
-            observation, reward, done, info = env.step(action)
-            # Feedback
-            if (done and j == 99):
-                break
-            if (done and int(reward) == 0):
-                link.weight -= modification_factor
-                break
-            if (done and int(reward) == 1):
-                print ("SUCCESS!")
-                return i
-            last_node = input_nodes[observation]
-            if (last_node.is_dead()):
-                link.weight -= modification_factor
-                break
+        modification_factor = 2
 
+        # Each iteration plays a full new game
+        for i in range(num_iter):
+            self.draw()
+            observation = env.reset()
+            # Each iteration pays a single move
+            for j in range(100):
+                # Play
+                node = input_nodes[observation]
+                link = node.get_highest_link()
+                output_node = link.finish
+                action = output_node.value
+                observation, reward, done, info = env.step(action)
+                # Feedback
+                if (done and j == 99):
+                    break
+                if (done and int(reward) == 0):
+                    link.weight -= modification_factor
+                    break
+                if (done and int(reward) == 1):
+                    print ("SUCCESS!")
+                    return i
+                last_node = input_nodes[observation]
+                if (last_node.is_dead()):
+                    link.weight -= modification_factor
+                    break
 
+    def draw(self):
+        # Create the data
+        data = []
+        for node in self.input_nodes:
+            row = [f'Node {node.value}:']
+            for link in node.links:
+                row.append(f"{link.weight}")
+            data.append(row)
+        
+        #Print table
+        table = columnar(data, headers=None, no_borders=True)
+        print (table)
+         
+            # print ("Node: " + str(node.value))
+            # for i, link in zip(range(0, len(node.links)), node.links):
+            #     print (f"   Link {i}: {link.weight}")
 
 
 def main():
@@ -93,10 +117,14 @@ def main():
     import gym
     env = gym.make('FrozenLake-v0')
 
+    model = network(input_nodes, output_nodes)
+    model.draw()
+
     # Train
-    num_episodes = train_model(env, input_nodes, 1000)
+    num_episodes = model.train_model(env, 1000)
 
     print ("Solved in " + str(num_episodes) + " episodes.")
+
 
 
 
